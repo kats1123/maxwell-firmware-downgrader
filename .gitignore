@@ -1,0 +1,28 @@
+# Build artifacts
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+.vs/
+
+# IDE
+.idea/
+*.swp
+*~
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Working files (not for distribution)
+*.BACKUP
+*.bak
+*_PATCHED.bin
+*_TEST.bin
+
+# Logs
+*.log
+
+# Local config
+local.config
