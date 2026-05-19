@@ -51,7 +51,7 @@ class FlasherForm : Form
     ProgressBar _progress;
     Label _status;
     AirohaSDK.UpdateCallback _callback = null!;
-    volatile bool _readyToApply, _done, _flashing, _applying;
+    volatile bool _readyToApply, _done, _flashing, _applying, _rebooting;
 
     static readonly ushort[] PIDS = [0x4B18, 0x4B19, 0x4B1A, 0x4B1E];
 
@@ -187,7 +187,7 @@ class FlasherForm : Form
         var tgt = _target.SelectedIndex == 0 ? "dongle" : "headset";
         var msg = tgt == "dongle"
             ? "For DONGLE update:\n- USB dongle plugged in (PC mode)\n- Headset powered ON wirelessly\n- Audeze apps closed"
-            : "For HEADSET update:\n- Headset connected via USB-C cable\n- Audeze apps closed";
+            : "For HEADSET update:\n- UNPLUG the USB dongle (must not be connected to PC)\n- Headset connected via USB-C cable to PC\n- Headset POWERED ON\n- Verify Windows detects the headset as an audio output device\n  (Sound settings -> Output -> 'Audeze Maxwell Game/Chat' should appear)\n- Audeze apps closed (HQ, Tray, etc.)";
 
         if (MessageBox.Show($"Flash {Path.GetFileName(fwFile)}?\n\n{msg}\n\nDO NOT disconnect during the process!",
             "Confirm Flash", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK)
@@ -195,6 +195,7 @@ class FlasherForm : Form
 
         _flashing = true;
         _applying = false;
+        _rebooting = false;
         _flashBtn.Enabled = false;
         _progress.MarqueeAnimationSpeed = 30;
         _log.Clear();
@@ -211,6 +212,7 @@ class FlasherForm : Form
         _readyToApply = false;
         _done = false;
         _applying = false;
+        _rebooting = false;
         _callback = OnSDKCallback;
 
         Log($"Firmware: {Path.GetFileName(fwFile)}");
@@ -272,6 +274,21 @@ class FlasherForm : Form
                     _readyToApply = false;
                 }
 
+                // Once we see REBOOTING (status 7), the SDK has handed off — the chip
+                // is now rebooting on its own. Stop polling/logging "Applying..." spam,
+                // treat as success.
+                if (_rebooting)
+                {
+                    SetStatus("Firmware update complete — device rebooting!");
+                    Log("");
+                    Log("*** SUCCESS! Firmware applied and device is rebooting. ***");
+                    Log("Wait 30 seconds for the device to fully reboot.");
+                    Invoke(() => MessageBox.Show(
+                        "Firmware update complete!\n\nDevice is rebooting. Wait 30 seconds, then verify the new firmware version in the Audeze app.",
+                        "Success", MessageBoxButtons.OK, MessageBoxIcon.Information));
+                    break;
+                }
+
                 if (_done)
                 {
                     SetStatus("Firmware update complete!");
@@ -317,7 +334,7 @@ class FlasherForm : Form
         else if (status == 1) { _done = true; Log("  [DFU_SUCCESS]"); }
         else if (status == 2) Log("  [FAIL/TIMEOUT]");
         else if (status == 6) { _applying = true; Log("  [APPLYING...]"); }
-        else if (status == 7) Log("  [REBOOTING...]");
+        else if (status == 7) { _rebooting = true; Log("  [REBOOTING...]"); }
     }
 }
 
