@@ -1025,6 +1025,11 @@ TOP-RIGHT DISPLAY
   flashing (see the same-version rule below).
 
 FIXING THE L/R BALANCE   (Balance tab)
+  IMPORTANT: tune the balance while the headset is running firmware
+  v1.0.1.74. The imbalance is specific to that version, and the custom
+  firmware you build is a v1.0.1.74 - tuning on any other version gives
+  the wrong values. Check the top-right version; flash v1.0.1.74 first
+  if you are not on it.
   1. Connect the headset to the PC with the USB-C cable.
   2. Click ""Read Balance"" - it shows the current Left and Right values.
   3. Adjust Left and Right. Lower the channel that is too loud, or raise

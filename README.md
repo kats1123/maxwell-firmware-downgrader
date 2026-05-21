@@ -55,6 +55,8 @@ The **top-right corner** shows the firmware version of what is connected — the
 
 This is the main job of the tool. The result is a custom firmware with your correction built in.
 
+> **Tune your balance on firmware v1.0.1.74.** The L/R imbalance this tool corrects is specific to **v1.0.1.74**, so you must dial in the correction while the headset is *running v1.0.1.74* — tune it on any other version and the values will not be right for the firmware you end up on. The custom firmware you build is itself a v1.0.1.74; installing it is a two-step flash (stock v1.0.1.63 first, then your custom v1.0.1.74 — see step 6). Your current version shows in the top-right corner; if you are not on v1.0.1.74, flash it on the Firmware tab first.
+
 **1. Connect the headset to the PC with the USB-C cable.** Close the Audeze app if it is open. Open `MaxwellTool.exe`.
 
 **2. Go to the Balance tab.** It reads the headset automatically and shows the current Left and Right values. **Read Balance** re-reads any time.
