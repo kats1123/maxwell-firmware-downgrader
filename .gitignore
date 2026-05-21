@@ -6,6 +6,9 @@ obj/
 *.userosscache
 .vs/
 
+# Built executable - distributed as a GitHub Release asset, never committed
+MaxwellTool.exe
+
 # IDE
 .idea/
 *.swp
@@ -20,6 +23,13 @@ Thumbs.db
 *.bak
 *_PATCHED.bin
 *_TEST.bin
+
+# User-generated custom firmware (the tool creates this folder at runtime)
+custom/
+
+# Self-test artifacts
+selftest_*.bin
+selftest_result.txt
 
 # Logs
 *.log
