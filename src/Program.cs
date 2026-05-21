@@ -149,7 +149,7 @@ class MaxwellForm : Form
     // balance page
     NumericUpDown _balL, _balR;
     Label _balCurrent;
-    Button _readBtn, _applyBtn, _makeFwBtn, _resetBtn2;
+    Button _readBtn, _applyBtn, _makeFwBtn, _resetBtn2, _srcBtn;
     TextBox _balLog;
 
     // detected device state (filled by RefreshHeadsetInfo)
@@ -1509,6 +1509,20 @@ SAFETY
         _resetBtn2.Font = new Font("Segoe UI Semibold", 11f);
         _resetBtn2.Click += OnReset;
 
+        _srcBtn = new Button
+        {
+            Text = "Check Source",
+            Location = new Point(216, 14),
+            Size = new Size(134, 28),
+            FlatStyle = FlatStyle.Flat,
+            Font = new Font("Segoe UI Semibold", 9f),
+            ForeColor = FG,
+            BackColor = PANEL,
+            Cursor = Cursors.Hand,
+        };
+        _srcBtn.FlatAppearance.BorderSize = 0;
+        _srcBtn.Click += OnCheckSource;
+
         _balL = Spinner(new Point(140, 60));
         _balR = Spinner(new Point(140, 100));
 
@@ -1539,7 +1553,7 @@ SAFETY
 
         p.Controls.AddRange(new Control[]
         {
-            _balCurrent, _readBtn, _resetBtn2,
+            _balCurrent, _srcBtn, _readBtn, _resetBtn2,
             Caption("Left  (0-150)", new Point(24, 63)), _balL,
             Caption("Right (0-150)", new Point(24, 103)), _balR,
             _applyBtn, _makeFwBtn, hint, balNote, _balLog,
@@ -1599,6 +1613,36 @@ SAFETY
         }
         else BalLog("Read failed: " + res.Message);
         _readBtn.Enabled = true;
+    }
+
+    // Reads NVDM 0xF702 - which per-source audio profile the headset has
+    // loaded right now (USB-C vs dongle/wireless).
+    async void OnCheckSource(object sender, EventArgs e)
+    {
+        if (_flashing || _resetting)
+        {
+            BalLog("A flash or reset is in progress - wait for it to finish.");
+            return;
+        }
+        _srcBtn.Enabled = false;
+        BalLog("Checking the audio source profile...");
+        var res = await Task.Run(() => HidRace.ReadSourceState());
+        if (res.Ok)
+        {
+            string profile = res.State == 0x0A ? "USB-C" : "Dongle / wireless";
+            BalLog($"Source profile: {profile}  (0xF702 = 0x{res.State:X2})");
+            Dlg(
+                $"This headset is currently on the {profile} audio profile.\n\n"
+                + $"Source-state byte 0xF702 = 0x{res.State:X2} ({res.State}).",
+                "Audio Source Profile", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        else
+        {
+            BalLog("Source check failed: " + res.Message);
+            Dlg("Could not read the source profile.\n\n" + res.Message,
+                "Audio Source Profile", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        _srcBtn.Enabled = true;
     }
 
     async void OnApply(object sender, EventArgs e)

@@ -44,6 +44,14 @@ static class HidRace
         public string Version = "";
     }
 
+    // Result of an audio source-state (NVDM 0xF702) read.
+    public class SourceResult
+    {
+        public bool Ok;
+        public string Message = "";
+        public int State = -1;     // raw 0xF702 byte; 0x0A = USB-C, else dongle/wireless
+    }
+
     // What Maxwell devices are physically connected right now.
     public class ConnInfo
     {
@@ -367,6 +375,25 @@ static class HidRace
             Thread.Sleep(50);
         }
         return -1;
+    }
+
+    // Read the audio source state (NVDM 0xF702) via RACE cmd 0x0901 sub 0x2F.
+    // State 0x0A = USB-C profile; any other value = dongle / wireless profile.
+    // 0x0901 relays through the dongle, so this works over USB-C or the dongle.
+    public static SourceResult ReadSourceState()
+    {
+        var r = new SourceResult();
+        IntPtr h = Open(out int outLen, out int inLen, out _);
+        if (h == INVALID) { r.Message = "Headset not found. Connect it via USB-C or the dongle."; return r; }
+        try
+        {
+            int st = ReadGain(h, outLen, inLen, 0x2F, 6);
+            if (st < 0) { r.Message = "No response from the headset."; return r; }
+            r.Ok = true;
+            r.State = st;
+            return r;
+        }
+        finally { CloseHandle(h); }
     }
 
     // Write L/R balance via RACE (cmd 0x0900 sub 0x29 = L, 0x2A = R).
