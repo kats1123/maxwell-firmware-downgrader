@@ -32,23 +32,26 @@ Keep everything in that folder together — the `.exe` needs the other files bes
 
 ### Why the imbalance happens — short version
 
-The L/R imbalance is a bug Audeze **added** in firmware `v1.0.1.61` and never finished fixing. Pre-v61 firmware (the `v1.0.1.56` release we now bundle as an option) doesn't have the bug at all.
+The L/R imbalance is a bug Audeze added in firmware `v1.0.1.61`. Pre-v61 firmware (the `v1.0.1.56` release we now bundle as an option) doesn't have the bug at all.
 
-**Pre-v61:** the Maxwell firmware had one balance default — `NVDM 0xF668 = 142/142` — symmetric, applied to all audio. No per-source switching, no asymmetric correction, nothing to get stuck on. **The imbalance bug literally does not exist in v56.**
+**Pre-v61:** the Maxwell firmware had one balance default — `NVDM 0xF668 = 142/142` — symmetric, applied to all audio. No per-source switching, no asymmetric correction. **The imbalance bug literally does not exist in v56.**
 
-**v1.0.1.61 (April 2024)** added an incomplete per-source switching system:
-* A new asymmetric balance default `NVDM 0xF665 = 141/149` (a per-channel correction Audeze evidently thought the USB-C signal path needed)
-* A new NVDM selector `0xF702` that picks which default to load at boot (`0x0A` → `0xF665` USB-C profile; anything else → `0xF668` wireless profile)
-* A complete event-routing infrastructure to switch `0xF702` automatically when the audio source changes — a state handler, per-source helper functions, a 22-entry dispatch table at `0x081C3134`
-* But **the master event router that drives the table was never wired up**. The table has zero loaders anywhere in the binary; surrounding clusters of `bx lr` stubs (at `0x081567CC` and `0x0820D264`) are the empty placeholder slots that were supposed to be filled in. The whole feature shipped inert.
+**v1.0.1.61 (April 2024)** added a per-source balance system:
+* A new asymmetric balance default `NVDM 0xF665 = 141/149` — a per-channel correction for the USB-C audio path.
+* The original symmetric default `NVDM 0xF668 = 147/147` stayed in place for wireless.
+* A new NVDM byte `0xF702` chooses which one loads at boot: `0x0A` → `0xF665` (USB-C, asymmetric); anything else → `0xF668` (wireless, symmetric).
 
-With no live driver, `0xF702` becomes a **frozen factory value**. Whatever Audeze's QC bench wrote at end-of-line is what the headset is stuck on for the life of the device — factory reset doesn't touch it, the Audeze app doesn't set it, and the dongle doesn't either. Some units shipped at `0x0A` (loading the asymmetric `141/149` default) and **those are the units that hear the imbalance**, regardless of how they connect. Others shipped at `0x00` and never notice anything wrong. `v1.0.1.63` and `v1.0.1.74` carry the same orphaned structure — only the wireless DSP coefficient column gets occasional tuning fixes; the master router still isn't wired up.
+The headset reads `0xF702` once at boot and uses it to pick the active balance. What's missing is *anything inside the firmware that automatically updates `0xF702` when the audio source changes*. We searched the firmware exhaustively — every function that reads or writes `0xF702`, every dispatch table, every event-bus path, in both the headset and the dongle, across v56/v61/v63/v74 — and could not find an in-firmware auto-switcher. We spent roughly fifty hours on it. It's possible such a path exists in some encoding we missed; we just couldn't find one.
+
+The practical result is that `0xF702` is effectively a frozen value: whatever it was set to at the factory is what your headset is stuck on for life. Factory reset doesn't touch it. The Audeze app doesn't change it. Some units shipped with `0xF702 = 0x0A` (loading the asymmetric `141/149` default) and **those are the units whose owners hear the imbalance**, regardless of how they actually connect. Other units shipped with `0xF702 = 0x00` (loading `147/147` symmetric) and never notice anything wrong. Exactly how production splits this way — per-SKU defaults, per-batch QC variation, a manufacturing step that wrote the byte on some units and not others — we don't know either.
+
+What we *do* know is that Audeze still actively maintains the wireless (symmetric) profile: they rewrote 115 of 118 entries in its DSP coefficient column between v63 and v74, with the v74 patch notes mentioning *"Fixed a bug that would cause EQ issues when updating previous versions of firmware."* They don't touch the USB-C asymmetric column. So the wireless profile is the one Audeze keeps under maintenance and clearly intends users to be on. Whether the USB-C asymmetric profile was ever supposed to be live on shipped units at all is unclear — pre-v56 firmware had no such profile, so users were universally on a single symmetric default.
 
 This tool gives you **three ways to fix it**, in increasing order of "permanence":
 
-1. **One-shot RACE write** — the "Set Audio Source" button on the Balance tab writes `0xF702 = 0`, putting your headset on the wireless profile. The setting persists indefinitely because nothing in the firmware ever rewrites it. No flashing required.
-2. **Custom v74 (or v63 / v61) firmware** — bakes your per-unit balance correction into the NVDM defaults *and* patches the `0xF702` reader function to always return `0`. After flashing, the headset ignores `0xF702` entirely. Bulletproof, immune to anything that might ever write the NVDM byte.
-3. **Custom v56 firmware** — bakes your balance into the pre-bug firmware. No per-source machinery, no asymmetric default. The simplest possible result: one balance value, applied to everything, no `0xF702` to worry about at all.
+1. **One-shot RACE write** — the "Set Audio Source" button on the Balance tab writes `0xF702 = 0`, putting your headset on the wireless profile. The write persists across power cycles (verified empirically — we wrote a probe value of `0x55`, fully power-cycled the headset, and read it back unchanged). No flashing required.
+2. **Custom v74 (or v63 / v61) firmware** — bakes your per-unit balance correction into the NVDM defaults *and* patches the `0xF702` reader function to always return `0`. After flashing, the headset ignores `0xF702` entirely and always loads the wireless (symmetric) profile. Functionally this reduces v74 to a **single-path architecture** — the wireless profile is the only one that ever loads, exactly the way v56 worked before Audeze added the per-source machinery.
+3. **Custom v56 firmware** — bakes your balance into the pre-bug firmware. No per-source machinery, no asymmetric default, no `0xF702`. **This is rolling back to the firmware from before the bug existed**, with your balance correction applied. Same end result as option 2 architecturally, just achieved by going back rather than patching forward.
 
 The Make Custom Firmware button lets you pick which base version to build on.
 
